@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CoreLocation
 
 
 // Example data for the Mural Locations
@@ -81,3 +82,25 @@ class MuralLocation {
     }
 }
 
+
+extension MuralLocation {
+    var validCoordinate: CLLocationCoordinate2D? {
+        guard let latitude = Double(lat), let longitude = Double(lon),
+              latitude.isFinite, longitude.isFinite else { return nil }
+        let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        return CLLocationCoordinate2DIsValid(coordinate) ? coordinate : nil
+    }
+
+    static func sortedByDistance(_ murals: [MuralLocation], from userLocation: CLLocation?) -> [MuralLocation] {
+        guard let userLocation = userLocation else { return murals }
+        // Keep invalid coordinates after valid ones, preserving input order for ties.
+        let distances = murals.enumerated().map { index, mural -> (Int, MuralLocation, Double) in
+            guard let coordinate = mural.validCoordinate else { return (index, mural, .infinity) }
+            let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            return (index, mural, userLocation.distance(from: location))
+        }
+        return distances.sorted { lhs, rhs in
+            lhs.2 == rhs.2 ? lhs.0 < rhs.0 : lhs.2 < rhs.2
+        }.map { $0.1 }
+    }
+}

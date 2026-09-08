@@ -26,8 +26,8 @@ class ViewController: UIViewController,UITableViewDataSource, UITableViewDelegat
     
     
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        let locationOfUser = locations[0] //this method returns an array of locations
-        //generally we always want the first one (usually there's only 1 anyway)
+        guard let locationOfUser = locations.last else { return }
+        // Use the most recent update, and tolerate an empty callback.
         
         let latitude = locationOfUser.coordinate.latitude
         let longitude = locationOfUser.coordinate.longitude
@@ -118,18 +118,13 @@ class ViewController: UIViewController,UITableViewDataSource, UITableViewDelegat
             let mural = muralLocations[indexPath.row]
             cell.title.text = "Title: \(mural.title)"
             // Add distance from user
-            let userLocation = locationManager.location
-            let muralLat:Double = Double(mural.lat) ?? 0.0
-            let muralLon:Double = Double(mural.lon) ?? 0.0
-            
-            let muralLocation = CLLocation(latitude: muralLat, longitude: muralLon)
-            // Get distance in meters
-            let distance = userLocation?.distance(from: muralLocation) ?? 0.0
-            // Convert to kilometers
-            let distanceInKm = distance / 1000
-            // Round to 2 decimal places
-            let distanceInKmRounded = String(format: "%.2f", distanceInKm)
-            cell.subtitle.text = "Artist: \(mural.artist) - \(distanceInKmRounded) km"
+            if let userLocation = locationManager.location, let coordinate = mural.validCoordinate {
+                let position = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+                let kilometres = userLocation.distance(from: position) / 1000
+                cell.subtitle.text = "Artist: \(mural.artist) - \(String(format: "%.2f", kilometres)) km"
+            } else {
+                cell.subtitle.text = "Artist: \(mural.artist) - distance unavailable"
+            }
             // Add thumbnail image
             if (mural.imageData != nil) {
                 cell.thumbnail.image = UIImage(data: mural.imageData!)
@@ -404,7 +399,7 @@ class ViewController: UIViewController,UITableViewDataSource, UITableViewDelegat
                                 if let muralDict = mural as? NSDictionary {
                                     // print the dictionary
                                     // create a new MuralLocation object
-                                    let enabled = muralDict["enabled"] as! String
+                                    let enabled = muralDict["enabled"] as? String
                                     if enabled == "1" {
                                         let newMural = MuralLocation()
                                         // set the properties of the new MuralLocation object
@@ -412,7 +407,7 @@ class ViewController: UIViewController,UITableViewDataSource, UITableViewDelegat
                                         if let artist = muralDict["artist"] as? String {
                                             newMural.artist = artist
                                         }
-                                        let enabled = muralDict["enabled"] as! String
+                                        let enabled = muralDict["enabled"] as? String
                                         if enabled == "1" {
                                             newMural.enabled = 1
                                         } else {
@@ -458,12 +453,7 @@ class ViewController: UIViewController,UITableViewDataSource, UITableViewDelegat
                                             }
                                         }
                                         
-                                        if (lastUpdated == ""){
-                                            self.muralLocations.append(newMural)
-                                        }
-                                        else{
-                                            updatedMuralLocations.append(newMural)
-                                        }
+                                        updatedMuralLocations.append(newMural)
 
 
                                     }
@@ -473,25 +463,17 @@ class ViewController: UIViewController,UITableViewDataSource, UITableViewDelegat
                                 }
                             }
                             
-                            // Sort the muralLocations array by distance from the user's location, closest first. 
-                            //Use lat and lon to create CLLocation objects, then use the distance function to calculate the 
-                            //distance between the user's location and the mural location.
-                            if (lastUpdated == ""){
-                                self.muralLocations.sort(by: { (mural1, mural2) -> Bool in
-                                    let mural1Location = CLLocation(latitude: Double(mural1.lat)!, longitude: Double(mural1.lon)!)
-                                    let mural2Location = CLLocation(latitude: Double(mural2.lat)!, longitude: Double(mural2.lon)!)
-
-                                    let uLocation = self.locationManager.location
-                                    let distance1 = mural1Location.distance(from: uLocation!)
-                                    let distance2 = mural2Location.distance(from: uLocation!)
-                                    return distance1 < distance2
-                                })
+                            // URLSession parses off the main queue; publish the model and UI together.
+                            let receivedMurals = updatedMuralLocations
+                            DispatchQueue.main.async {
+                                if lastUpdated.isEmpty {
+                                    let userLocation = self.locationManager.location
+                                    self.muralLocations = MuralLocation.sortedByDistance(receivedMurals, from: userLocation)
+                                } else {
+                                    self.mergeWithExistingMuralData(updatedMuralLocations: receivedMurals)
+                                }
+                                self.theTable.reloadData()
                             }
-                            else {
-                                self.mergeWithExistingMuralData(updatedMuralLocations: updatedMuralLocations)
-                            }
-
-                            // self.theTable.reloadData()
                         }
                     } catch {
                         print("ERROR")

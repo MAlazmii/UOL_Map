@@ -20,7 +20,7 @@ The Xcode project and data models were restored from their original ZIP archives
 
 ## Status and limitations
 
-This is a preserved coursework prototype, not a production app. Mural records and images depend on the University of Liverpool teaching service at `cgi.csc.liv.ac.uk`; availability has not been verified and no offline seed dataset is included. The existing implementation assumes well-formed responses and an available location in several places, so denied location access or unavailable data can expose unfinished error handling. Persistence and asynchronous refresh behaviour need simulator testing.
+This is a preserved coursework prototype, not a production app. Mural records and images depend on the University of Liverpool teaching service at `cgi.csc.liv.ac.uk`; availability has not been verified and no offline seed dataset is included. Mural ordering tolerates unavailable locations and invalid coordinates; results and table updates are published on the main queue. The older persistence refresh still uses a timed insert and records the refresh date before network completion, so persistence and offline/error behaviour need further work.
 
 Project references, property lists, JSON and XML resources have been checked locally. An iOS build and simulator run have **not** been completed: the validation machine has Command Line Tools rather than full Xcode, and its Swift toolchain also reports a duplicate `SwiftBridging` module. App Store icon artwork and signing configuration are still required for distribution.
 
@@ -31,3 +31,5 @@ Original coursework authorship is preserved in the source headers, including Phi
 ## Automated checks
 
 Run `python3 scripts/validate_resources.py` for portable resource checks. GitHub Actions runs this check and attempts unsigned iOS Simulator builds on macOS. These workflows have not yet been run remotely; successful local resource checks do not establish that an iOS build passes.
+
+Focused Swift regression checks run with `python3 scripts/test_logic.py` on macOS and in a separate GitHub Actions job. They test the shared logic used by the app, without requiring an iOS simulator.
